@@ -1,0 +1,22 @@
+{
+  "name": "godot-pong-nodejs-server",
+  "version": "1.0.0",
+  "description": "Backed NodeJs server that takes advantage of Web Sockets to coordinate a Pong multiplayer game made in Godot.",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicola-stroffolino/godot-pong-nodejs-server.git"
+  },
+  "author": "Nicola Stroffolino",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nicola-stroffolino/godot-pong-nodejs-server/issues"
+  },
+  "homepage": "https://github.com/nicola-stroffolino/godot-pong-nodejs-server#readme",
+  "dependencies": {
+    "ws": "^8.17.0"
+  }
+}
