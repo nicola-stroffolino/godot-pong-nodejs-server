@@ -10,6 +10,7 @@ console.log(`running on port: ${port}`);
 wss.on("connection", (socket) => {
   socket.on("message", (message) => {
     let data = JSON.parse(message);
+    console.log(`id: ${data.id}, x: ${data.x}, y: ${data.y}`);
 
     if (gameState.filter((el) => el.id == data.id).length > 0) {
       gameState = gameState.map((el) => {
