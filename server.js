@@ -15,16 +15,20 @@ wss.on("connection", (socket) => {
 
     switch (data.RequestType) {
       case "Create Room":
-        let room = createRoom(data.Data.Name, data.Data.Password);
-        rooms.push(room);
-        joinRoom(room, socket);
+        if (!getRoomByName(data.Data.Name)) {
+          let room = createRoom(data.Data.Name, data.Data.Password);
+          rooms.push(room);
+          player = joinRoom(room, socket, data.Data.Nickname);
+        } else {
+          socket.send(JSON.stringify({ error: "Room already exists" }));
+        }
         break;
       case "Join Room":
-        let roomToJoin = rooms.find((room) => room.players.length < 2 && room.name === data.RoomName && room.password === data.RoomPassword); // Find a room with available slot, matching name, and password
-        if (roomToJoin) {
-          joinRoom(roomToJoin, socket);
+        let roomToJoin = getRoomByName(data.Data.Name);
+        if (roomToJoin && roomToJoin.password === data.Data.Password) {
+          player = joinRoom(roomToJoin, socket, data.Data.Nickname);
         } else {
-          socket.send(JSON.stringify({ error: "No matching rooms found" }));
+          socket.send(JSON.stringify({ error: "Room does not exist or incorrect password" }));
         }
         break;
       case "Start Room":
@@ -37,50 +41,37 @@ wss.on("connection", (socket) => {
 
   socket.on("close", (code, reason) => {
     if (player) {
-      // Remove the player from the room when the socket is closed
       let room = player.room;
       if (room) {
         room.players = room.players.filter((p) => p !== player);
         if (room.players.length === 0) {
-          // Remove the room if there are no players left
-          const index = rooms.indexOf(room);
-          if (index !== -1) {
-            rooms.splice(index, 1);
-          }
+          rooms = rooms.filter((r) => r !== room);
         }
       }
-      console.log(`Player ${player.id} disconnected`);
+      console.log(`Player ${player.nickname} disconnected`);
     }
   });
 });
 
 function createRoom(name, password) {
   return {
-    id: rooms.length, // Use the index of the room in the array as the ID
+    id: name,
     name: name,
     password: password,
     players: [],
   };
 }
 
-function joinRoom(room, socket) {
-  let playerId = room.players.length + 1; // Generate player ID
-  let player = { id: playerId, socket: socket, room: room };
+function joinRoom(room, socket, nickname) {
+  let playerId = room.players.length + 1;
+  let player = { id: playerId, nickname: nickname };
   room.players.push(player);
-  socket.send(JSON.stringify({ roomId: room.id, playerId: playerId }));
+
+  socket.send(JSON.stringify({ room: room, player: player, prova: "ciao" }));
+  
+  return player;
 }
 
-/*
-when creating a room the server will receive a json with this info
-
-{
-RequestType: "Create Room",
-Data: {
-Name: 
-Password:
-Nickname:
+function getRoomByName(name) {
+  return rooms.find((room) => room.name === name);
 }
-}
-
-as i want that everytime you create or join a room you as the player will choose your nickname for that room
-*/
