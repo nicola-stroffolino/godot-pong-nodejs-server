@@ -18,7 +18,7 @@ wss.on("connection", (socket) => {
         if (!getRoomByName(data.Data.Name)) {
           let room = createRoom(data.Data.Name, data.Data.Password);
           rooms.push(room);
-          player = joinRoom(room, socket, data.Data.Nickname);
+          socket = joinRoom(room, socket, data.Data.Nickname);
         } else {
           socket.send(JSON.stringify({ error: "Room already exists" }));
         }
@@ -26,13 +26,20 @@ wss.on("connection", (socket) => {
       case "Join Room":
         let roomToJoin = getRoomByName(data.Data.Name);
         if (roomToJoin && roomToJoin.password === data.Data.Password) {
-          player = joinRoom(roomToJoin, socket, data.Data.Nickname);
+          socket = joinRoom(roomToJoin, socket, data.Data.Nickname);
         } else {
           socket.send(JSON.stringify({ error: "Room does not exist or incorrect password" }));
         }
         break;
-      case "Start Room":
-        // Not implemented for now
+      case "Player Move":
+        let playerData = data.Data;
+        let room = getRoomByName(socket.roomName);
+        room.players.forEach(player => {
+          if (player.id != playerData.id) {
+            console.log('player ' + player.id + ' is receiving data.');
+            player.send(JSON.stringify({ id: player.id, x: playerData.x, y: playerData.y }))
+          }
+        });
         break;
       default:
         break;
@@ -40,22 +47,19 @@ wss.on("connection", (socket) => {
   });
 
   socket.on("close", (code, reason) => {
-    if (player) {
-      let room = player.room;
-      if (room) {
-        room.players = room.players.filter((p) => p !== player);
-        if (room.players.length === 0) {
-          rooms = rooms.filter((r) => r !== room);
-        }
+    let room = getRoomByName(socket.roomName);
+    if (room) {
+      room.players = room.players.filter((p) => p !== socket);
+      if (room.players.length === 0) {
+        rooms = rooms.filter((r) => r !== room);
       }
-      console.log(`Player ${player.nickname} disconnected`);
     }
+    console.log(`Player ${socket.nickname} disconnected`);
   });
 });
 
 function createRoom(name, password) {
   return {
-    id: name,
     name: name,
     password: password,
     players: [],
@@ -63,13 +67,14 @@ function createRoom(name, password) {
 }
 
 function joinRoom(room, socket, nickname) {
-  let playerId = room.players.length + 1;
-  let player = { id: playerId, nickname: nickname };
-  room.players.push(player);
+  socket.id = room.players.length + 1;
+  socket.nickname = nickname;
+  socket.roomName = room.name;
+  room.players.push(socket);
 
-  socket.send(JSON.stringify({ room: room, player: player, prova: "ciao" }));
+  socket.send(JSON.stringify({ room: room, player: socket }));
   
-  return player;
+  return socket;
 }
 
 function getRoomByName(name) {
