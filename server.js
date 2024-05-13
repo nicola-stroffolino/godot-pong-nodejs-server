@@ -11,22 +11,26 @@ console.log(`running on port: ${port}`);
 
 wss.on("connection", (socket) => {
   socket.on("message", (message) => {
-    let data = JSON.parse(message);
+    let jsonMessage = JSON.parse(message);
 
-    switch (data.RequestType) {
+    let requestType = jsonMessage.RequestType;
+    let data = jsonMessage.Data;
+    let room = getRoomByName(socket.roomName);
+
+    switch (requestType) {
       case "Create Room":
-        if (!getRoomByName(data.Data.Name)) {
-          let room = createRoom(data.Data.Name, data.Data.Password);
-          rooms.push(room);
-          socket = joinRoom(room, socket, data.Data.Nickname);
+        if (!getRoomByName(data.Name)) {
+          let newRoom = createRoom(data.Name, data.Password);
+          rooms.push(newRoom);
+          socket = joinRoom(newRoom, socket, data.Nickname);
         } else {
           socket.send(JSON.stringify({ error: "Room already exists" }));
         }
         break;
       case "Join Room":
-        let roomToJoin = getRoomByName(data.Data.Name);
-        if (roomToJoin && roomToJoin.password === data.Data.Password) {
-          socket = joinRoom(roomToJoin, socket, data.Data.Nickname);
+        let roomToJoin = getRoomByName(data.Name);
+        if (roomToJoin && roomToJoin.password === data.Password) {
+          socket = joinRoom(roomToJoin, socket, data.Nickname);
           var socket_2 = roomToJoin.players.find((player) => player.id != socket.id);
 
           socket.send(JSON.stringify({ oppNickname: socket_2.nickname }));
@@ -37,21 +41,11 @@ wss.on("connection", (socket) => {
           socket.cards = drawCards(roomToJoin.deck, 7);
           socket_2.cards = drawCards(roomToJoin.deck, 7);
           
-          socket.send(JSON.stringify({ draw: socket.cards }));
-          socket_2.send(JSON.stringify({ draw: socket_2.cards }));
+          socket.send(JSON.stringify({ draw: socket.cards, oppDrawNumber: socket_2.cards.length }));
+          socket_2.send(JSON.stringify({ draw: socket_2.cards, oppDrawNumber: socket.cards.length }));
         } else {
           socket.send(JSON.stringify({ error: "Room does not exist or incorrect password" }));
         }
-        break;
-      case "Player Move":
-        let playerData = data.Data;
-        let room = getRoomByName(socket.roomName);
-        room.players.forEach(player => {
-          if (player.id != playerData.id) {
-            console.log('player ' + player.id + ' is receiving data.');
-            player.send(JSON.stringify({ id: player.id, x: playerData.x, y: playerData.y }));
-          }
-        });
         break;
       case "Play Card":
 
@@ -69,6 +63,7 @@ wss.on("connection", (socket) => {
         rooms = rooms.filter((r) => r !== room);
       }
     }
+    console.log(rooms);
     console.log(`Player ${socket.nickname} - Room ${room.name} disconnected`);
   });
 });
