@@ -15,6 +15,7 @@ wss.on("connection", (socket) => {
 
     let requestType = jsonMessage.RequestType;
     let data = jsonMessage.Data;
+    console.log(data);
     let room = getRoomByName(socket.roomName);
 
     switch (requestType) {
@@ -37,17 +38,32 @@ wss.on("connection", (socket) => {
           socket_2.send(JSON.stringify({ oppNickname: socket.nickname }));
           
           roomToJoin.deck = shuffleDeck(roomToJoin.deck);
+          console.log(roomToJoin.deck);
           
           socket.cards = drawCards(roomToJoin.deck, 7);
           socket_2.cards = drawCards(roomToJoin.deck, 7);
+          roomToJoin.playedCard = drawCards(roomToJoin.deck, 1)[0];
           
-          socket.send(JSON.stringify({ draw: socket.cards, oppDrawNumber: socket_2.cards.length }));
-          socket_2.send(JSON.stringify({ draw: socket_2.cards, oppDrawNumber: socket.cards.length }));
+          socket.send(JSON.stringify({ draw: socket.cards, oppDrawNumber: socket_2.cards.length, playedCard: roomToJoin.playedCard }));
+          socket_2.send(JSON.stringify({ draw: socket_2.cards, oppDrawNumber: socket.cards.length, playedCard: roomToJoin.playedCard }));
         } else {
           socket.send(JSON.stringify({ error: "Room does not exist or incorrect password" }));
         }
         break;
       case "Play Card":
+        let name = data.Name;
+        let color = data.Color;
+        let value = data.Value;
+        console.log(`${socket.nickname} played ${name} (${color}, ${value}).`);
+
+        socket.cards = socket.cards.filter(card => card !== name);
+        room.playedCard.color = color;
+        room.playedCard.value = value;
+
+        var socket_2 = room.players.find((player) => player.id != socket.id);
+        
+        socket.send(JSON.stringify({ newColor: color, newValue: value }));
+        socket_2.send(JSON.stringify({ newColor: color, newValue: value }));
 
         break;
       default:
@@ -63,7 +79,6 @@ wss.on("connection", (socket) => {
         rooms = rooms.filter((r) => r !== room);
       }
     }
-    console.log(rooms);
     console.log(`Player ${socket.nickname} - Room ${room.name} disconnected`);
   });
 });
@@ -73,7 +88,9 @@ function createRoom(name, password) {
     name: name,
     password: password,
     players: [],
-    deck: defaultDeck.deck
+    deck: [ ...defaultDeck.deck ], // copy the object without reference
+    playedCard: null,
+    turn: null
   };
 }
 
