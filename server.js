@@ -58,12 +58,15 @@ wss.on("connection", (socket) => {
         let color = data.Color;
         let value = data.Value;
         console.log(`Player '${socket.nickname}' in room '${room.name}' played card '${name}' (${color}, ${value}).`);
-
+        
+        var socket_2 = room.players.find((player) => player.id != socket.id);
+        
         socket.cards = socket.cards.filter(card => card !== name);
+        socket_2.send(JSON.stringify({ oppCardsNumber: socket.cards.length }));
+
         room.playedCard.color = color;
         room.playedCard.value = value;
 
-        var socket_2 = room.players.find((player) => player.id != socket.id);
         
         console.log(`Sending played card ${JSON.stringify({ newColor: color, newValue: value })} . . .`);
 
@@ -71,7 +74,9 @@ wss.on("connection", (socket) => {
         socket_2.send(JSON.stringify({ newColor: color, newValue: value }));
 
         room.turn = socket_2;
-        room.turn.send(JSON.stringify({ yourTurn: true }));
+        socket_2.send(JSON.stringify({ yourTurn: true }));
+
+
 
         break;
       default:
