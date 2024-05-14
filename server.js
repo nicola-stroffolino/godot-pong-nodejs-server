@@ -23,6 +23,7 @@ wss.on("connection", (socket) => {
           let newRoom = createRoom(data.Name, data.Password);
           rooms.push(newRoom);
           socket = joinRoom(newRoom, socket, data.Nickname);
+          newRoom.turn = socket;
 
           console.log(`Player '${socket.nickname}' created room '${newRoom.name}'.`);
         } else {
@@ -65,8 +66,12 @@ wss.on("connection", (socket) => {
         var socket_2 = room.players.find((player) => player.id != socket.id);
         
         console.log(`Sending played card ${JSON.stringify({ newColor: color, newValue: value })} . . .`);
+
         socket.send(JSON.stringify({ newColor: color, newValue: value }));
         socket_2.send(JSON.stringify({ newColor: color, newValue: value }));
+
+        room.turn = socket_2;
+        room.turn.send(JSON.stringify({ yourTurn: true }));
 
         break;
       default:
