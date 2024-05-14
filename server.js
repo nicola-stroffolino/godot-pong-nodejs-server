@@ -15,7 +15,6 @@ wss.on("connection", (socket) => {
 
     let requestType = jsonMessage.RequestType;
     let data = jsonMessage.Data;
-    console.log(data);
     let room = getRoomByName(socket.roomName);
 
     switch (requestType) {
@@ -24,6 +23,8 @@ wss.on("connection", (socket) => {
           let newRoom = createRoom(data.Name, data.Password);
           rooms.push(newRoom);
           socket = joinRoom(newRoom, socket, data.Nickname);
+
+          console.log(`Player '${socket.nickname}' created room '${newRoom.name}'.`);
         } else {
           socket.send(JSON.stringify({ error: "Room already exists" }));
         }
@@ -32,13 +33,14 @@ wss.on("connection", (socket) => {
         let roomToJoin = getRoomByName(data.Name);
         if (roomToJoin && roomToJoin.password === data.Password) {
           socket = joinRoom(roomToJoin, socket, data.Nickname);
+          console.log(`Player '${socket.nickname}' joined room '${roomToJoin.name}'.`);
+
           var socket_2 = roomToJoin.players.find((player) => player.id != socket.id);
 
           socket.send(JSON.stringify({ oppNickname: socket_2.nickname }));
           socket_2.send(JSON.stringify({ oppNickname: socket.nickname }));
           
           roomToJoin.deck = shuffleDeck(roomToJoin.deck);
-          console.log(roomToJoin.deck);
           
           socket.cards = drawCards(roomToJoin.deck, 7);
           socket_2.cards = drawCards(roomToJoin.deck, 7);
@@ -54,7 +56,7 @@ wss.on("connection", (socket) => {
         let name = data.Name;
         let color = data.Color;
         let value = data.Value;
-        console.log(`${socket.nickname} played ${name} (${color}, ${value}).`);
+        console.log(`Player '${socket.nickname}' in room '${room.name}' played card '${name}' (${color}, ${value}).`);
 
         socket.cards = socket.cards.filter(card => card !== name);
         room.playedCard.color = color;
@@ -62,6 +64,7 @@ wss.on("connection", (socket) => {
 
         var socket_2 = room.players.find((player) => player.id != socket.id);
         
+        console.log(`Sending played card ${JSON.stringify({ newColor: color, newValue: value })} . . .`);
         socket.send(JSON.stringify({ newColor: color, newValue: value }));
         socket_2.send(JSON.stringify({ newColor: color, newValue: value }));
 
@@ -79,7 +82,7 @@ wss.on("connection", (socket) => {
         rooms = rooms.filter((r) => r !== room);
       }
     }
-    console.log(`Player ${socket.nickname} - Room ${room.name} disconnected`);
+    console.log(`Player '${socket.nickname}' disconnected from room '${room.name}'.`);
   });
 });
 
@@ -119,4 +122,8 @@ function shuffleDeck(array) {
 
 function drawCards(array, count) {
   return array.splice(-count, count);
+}
+
+function handleCardPlay(card) {
+
 }
