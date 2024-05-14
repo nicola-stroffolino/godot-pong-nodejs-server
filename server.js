@@ -15,70 +15,92 @@ wss.on("connection", (socket) => {
 
     let requestType = jsonMessage.RequestType;
     let data = jsonMessage.Data;
-    let room = getRoomByName(socket.roomName);
 
     switch (requestType) {
-      case "Create Room":
-        if (!getRoomByName(data.Name)) {
-          let newRoom = createRoom(data.Name, data.Password);
-          rooms.push(newRoom);
-          socket = joinRoom(newRoom, socket, data.Nickname);
-          newRoom.turn = socket;
-
-          console.log(`Player '${socket.nickname}' created room '${newRoom.name}'.`);
-        } else {
+      case "Create Room": {
+        if (getRoomByName(data.Name)) {
           socket.send(JSON.stringify({ error: "Room already exists" }));
+          return;
         }
+
+        let room = createRoom(data.Name, data.Password);
+        rooms.push(room);
+        socket = joinRoom(room, socket, data.Nickname);
+
+        console.log(`Player '${socket.nickname}' created room '${room.name}'.`);
         break;
-      case "Join Room":
-        let roomToJoin = getRoomByName(data.Name);
-        if (roomToJoin && roomToJoin.password === data.Password) {
-          socket = joinRoom(roomToJoin, socket, data.Nickname);
-          console.log(`Player '${socket.nickname}' joined room '${roomToJoin.name}'.`);
-
-          var socket_2 = roomToJoin.players.find((player) => player.id != socket.id);
-
-          socket.send(JSON.stringify({ oppNickname: socket_2.nickname }));
-          socket_2.send(JSON.stringify({ oppNickname: socket.nickname }));
-          
-          roomToJoin.deck = shuffleDeck(roomToJoin.deck);
-          
-          socket.cards = drawCards(roomToJoin.deck, 7);
-          socket_2.cards = drawCards(roomToJoin.deck, 7);
-          roomToJoin.playedCard = drawCards(roomToJoin.deck, 1)[0];
-          
-          socket.send(JSON.stringify({ draw: socket.cards, oppDrawNumber: socket_2.cards.length, playedCard: roomToJoin.playedCard }));
-          socket_2.send(JSON.stringify({ draw: socket_2.cards, oppDrawNumber: socket.cards.length, playedCard: roomToJoin.playedCard }));
-        } else {
+      }
+      case "Join Room": {
+        let room = getRoomByName(data.Name);
+        if (!room || room.password !== data.Password) {
           socket.send(JSON.stringify({ error: "Room does not exist or incorrect password" }));
+          return;
         }
+
+        var socket_2 = room.players.find((player) => player.id != socket.id);
+        
+        socket = joinRoom(room, socket, data.Nickname);
+
+        room.deck = shuffleDeck(room.deck);
+        socket.cards = drawCards(room.deck, 7);
+        socket_2.cards = drawCards(room.deck, 7);
+        room.discardPile = drawCards(room.deck, 1)[0];
+
+        socket.send(JSON.stringify({
+          responseType: 'Game Started',
+          cardsDrawn: socket.cards,
+          opponentNickname: socket_2.nickname,
+          opponentCardsDrawnNumber: socket_2.cards.length,
+          discardPile: room.discardPile
+        }));
+
+        socket_2.send(JSON.stringify({
+          responseType: 'Game Started',
+          cardsDrawn: socket_2.cards,
+          opponentNickname: socket.nickname,
+          opponentCardsDrawnNumber: socket.cards.length,
+          discardPile: room.discardPile
+        }));
+
+        console.log(`Player '${socket.nickname}' joined room '${room.name}'.`);
         break;
-      case "Play Card":
+      }
+      case "Play Card": {
         let name = data.Name;
         let color = data.Color;
         let value = data.Value;
         console.log(`Player '${socket.nickname}' in room '${room.name}' played card '${name}' (${color}, ${value}).`);
-        
+
         var socket_2 = room.players.find((player) => player.id != socket.id);
-        
+
         socket.cards = socket.cards.filter(card => card !== name);
         socket_2.send(JSON.stringify({ oppCardsNumber: socket.cards.length }));
 
         room.playedCard.color = color;
         room.playedCard.value = value;
 
-        
+
         console.log(`Sending played card ${JSON.stringify({ newColor: color, newValue: value })} . . .`);
 
         socket.send(JSON.stringify({ newColor: color, newValue: value }));
         socket_2.send(JSON.stringify({ newColor: color, newValue: value }));
 
-        room.turn = socket_2;
         socket_2.send(JSON.stringify({ yourTurn: true }));
-
-
-
         break;
+      }
+      case "Draw Card": {
+        let quantity = data.Quantity;
+        var socket_2 = room.players.find((player) => player.id != socket.id);
+
+        let drawnCards = drawCards(room.deck, quantity);
+        socket.cards = [...socket.cards, ...drawnCards];
+
+        socket.send(JSON.stringify({ draw: drawnCards }));
+        socket_2.send(JSON.stringify({ oppCardsNumber: socket.cards.length }));
+        
+        console.log(`Player '${socket.nickname}' has drawn ${quantity} card(s) (${drawnCards}).`);
+        break;
+      }
       default:
         break;
     }
@@ -101,9 +123,8 @@ function createRoom(name, password) {
     name: name,
     password: password,
     players: [],
-    deck: [ ...defaultDeck.deck ], // copy the object without reference
-    playedCard: null,
-    turn: null
+    deck: [...defaultDeck.deck], // copy the object without reference
+    discardPile: null
   };
 }
 
@@ -114,7 +135,7 @@ function joinRoom(room, socket, nickname) {
   room.players.push(socket);
 
   socket.send(JSON.stringify({ room: room, player: socket }));
-  
+
   return socket;
 }
 
@@ -132,8 +153,4 @@ function shuffleDeck(array) {
 
 function drawCards(array, count) {
   return array.splice(-count, count);
-}
-
-function handleCardPlay(card) {
-
 }
