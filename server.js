@@ -92,7 +92,7 @@ wss.on("connection", (socket) => {
 
         console.log(`Player '${socket.nickname}' in room '${room.name}' played card '${name}' (${color}, ${value}).`);
         
-        var winner = CheckForWinner();
+        var winner = CheckForWinner(socket, socket_2);
         if (winner != null) {
           // do something
         }
@@ -180,3 +180,8 @@ function CheckForWinner(socket, socket_2) {
   if (socket.cards.length == 0) return socket_2;
   return null;
 }
+
+// TO DO
+// - Actually give out the winning message
+// - Action cards
+// - Deck running out of cards
