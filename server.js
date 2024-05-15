@@ -37,7 +37,7 @@ wss.on("connection", (socket) => {
           return;
         }
 
-        var socket_2 = room.players.find((player) => player.id != socket.id);
+        let socket_2 = room.players.find((player) => player.id != socket.id);
         
         socket = joinRoom(room, socket, data.Nickname);
 
@@ -67,7 +67,7 @@ wss.on("connection", (socket) => {
       }
       case "Play Card": {
         let room = getRoomByName(socket.roomName);
-        var socket_2 = room.players.find((player) => player.id != socket.id);
+        let socket_2 = room.players.find((player) => player.id != socket.id);
 
         let name = data.Name;
         let color = data.Color;
@@ -90,25 +90,35 @@ wss.on("connection", (socket) => {
           yourTurn: true,
         }));
 
-        // socket_2.send(JSON.stringify({
-        //   responseType: 'Change Turn',
-        //   oppCardsNumber: socket.cards.length
-        // }));
-
         console.log(`Player '${socket.nickname}' in room '${room.name}' played card '${name}' (${color}, ${value}).`);
+        
+        var winner = CheckForWinner();
+        if (winner != null) {
+          // do something
+        }
+
         break;
       }
       case "Draw Card": {
+        let room = getRoomByName(socket.roomName);
+        let socket_2 = room.players.find((player) => player.id != socket.id);
+        
         let quantity = data.Quantity;
-        var socket_2 = room.players.find((player) => player.id != socket.id);
 
         let drawnCards = drawCards(room.deck, quantity);
         socket.cards = [...socket.cards, ...drawnCards];
-
-        socket.send(JSON.stringify({ draw: drawnCards }));
-        socket_2.send(JSON.stringify({ oppCardsNumber: socket.cards.length }));
         
-        console.log(`Player '${socket.nickname}' has drawn ${quantity} card(s) (${drawnCards}).`);
+        socket.send(JSON.stringify({
+          responseType: 'Card Drawn',
+          drawnCards: drawnCards
+        }));
+
+        socket_2.send(JSON.stringify({
+          responseType: 'Card Drawn',
+          opponentCardsDrawnNumber: drawnCards.length
+        }));
+        
+        console.log(`Player '${socket.nickname}' has drawn ${drawnCards.length} card(s) (${drawnCards}).`);
         break;
       }
       default:
@@ -163,4 +173,10 @@ function shuffleDeck(array) {
 
 function drawCards(array, count) {
   return array.splice(-count, count);
+}
+
+function CheckForWinner(socket, socket_2) {
+  if (socket.cards.length == 0) return socket;
+  if (socket.cards.length == 0) return socket_2;
+  return null;
 }
