@@ -66,26 +66,36 @@ wss.on("connection", (socket) => {
         break;
       }
       case "Play Card": {
+        let room = getRoomByName(socket.roomName);
+        var socket_2 = room.players.find((player) => player.id != socket.id);
+
         let name = data.Name;
         let color = data.Color;
         let value = data.Value;
-        console.log(`Player '${socket.nickname}' in room '${room.name}' played card '${name}' (${color}, ${value}).`);
-
-        var socket_2 = room.players.find((player) => player.id != socket.id);
-
+        
         socket.cards = socket.cards.filter(card => card !== name);
         socket_2.send(JSON.stringify({ oppCardsNumber: socket.cards.length }));
+        
+        room.discardPile = `${color}_${value}`;
+        
+        socket.send(JSON.stringify({
+          responseType: 'Card Played',
+          discardPile: room.discardPile,
+          yourTurn: false,
+        }));
+        
+        socket_2.send(JSON.stringify({
+          responseType: 'Card Played',
+          discardPile: room.discardPile,
+          yourTurn: true,
+        }));
 
-        room.playedCard.color = color;
-        room.playedCard.value = value;
+        // socket_2.send(JSON.stringify({
+        //   responseType: 'Change Turn',
+        //   oppCardsNumber: socket.cards.length
+        // }));
 
-
-        console.log(`Sending played card ${JSON.stringify({ newColor: color, newValue: value })} . . .`);
-
-        socket.send(JSON.stringify({ newColor: color, newValue: value }));
-        socket_2.send(JSON.stringify({ newColor: color, newValue: value }));
-
-        socket_2.send(JSON.stringify({ yourTurn: true }));
+        console.log(`Player '${socket.nickname}' in room '${room.name}' played card '${name}' (${color}, ${value}).`);
         break;
       }
       case "Draw Card": {
