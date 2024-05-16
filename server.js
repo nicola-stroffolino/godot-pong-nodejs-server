@@ -92,9 +92,20 @@ wss.on("connection", (socket) => {
 
         console.log(`Player '${socket.nickname}' in room '${room.name}' played card '${name}' (${color}, ${value}).`);
         
-        var winner = CheckForWinner(socket, socket_2);
+        var winner = checkForWinner(socket, socket_2);
         if (winner != null) {
-          // do something
+          console.log(`\n'${winner.nickname}' in room '${room.name}' has won!\n`);
+          let loser = room.players.find((player) => player.id != winner.id);
+          
+          winner.send(JSON.stringify({
+            responseType: 'Game Ended',
+            winner: true
+          }));
+
+          loser.send(JSON.stringify({
+            responseType: 'Game Ended',
+            winner: false
+          }));
         }
 
         break;
@@ -118,7 +129,7 @@ wss.on("connection", (socket) => {
           opponentCardsDrawnNumber: drawnCards.length
         }));
         
-        console.log(`Player '${socket.nickname}' has drawn ${drawnCards.length} card(s) (${drawnCards}).`);
+        console.log(`Player '${socket.nickname}' in room '${room.name}' has drawn ${drawnCards.length} card(s) (${drawnCards}).`);
         break;
       }
       default:
@@ -133,8 +144,8 @@ wss.on("connection", (socket) => {
       if (room.players.length === 0) {
         rooms = rooms.filter((r) => r !== room);
       }
+      console.log(`Player '${socket.nickname}' disconnected from room '${room.name}'.`);
     }
-    console.log(`Player '${socket.nickname}' disconnected from room '${room.name}'.`);
   });
 });
 
@@ -166,7 +177,7 @@ function getRoomByName(name) {
 function shuffleDeck(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]]; // Scambio gli elementi
+    [array[i], array[j]] = [array[j], array[i]];
   }
   return array;
 }
@@ -175,13 +186,12 @@ function drawCards(array, count) {
   return array.splice(-count, count);
 }
 
-function CheckForWinner(socket, socket_2) {
+function checkForWinner(socket, socket_2) {
   if (socket.cards.length == 0) return socket;
-  if (socket.cards.length == 0) return socket_2;
+  if (socket_2.cards.length == 0) return socket_2;
   return null;
 }
 
 // TO DO
-// - Actually give out the winning message
 // - Action cards
 // - Deck running out of cards
