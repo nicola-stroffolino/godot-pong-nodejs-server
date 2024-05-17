@@ -73,8 +73,7 @@ wss.on("connection", (socket) => {
         let color = data.Color;
         let value = data.Value;
         
-        socket.cards = socket.cards.filter(card => card !== name);
-        socket_2.send(JSON.stringify({ oppCardsNumber: socket.cards.length }));
+        socket.cards.splice(socket.cards.findIndex(card => card === name), 1);
         
         room.discardPile = `${color}_${value}`;
         
@@ -90,6 +89,8 @@ wss.on("connection", (socket) => {
           yourTurn: true,
         }));
 
+        console.log(socket.cards);
+        console.log(socket_2.cards)
         console.log(`Player '${socket.nickname}' in room '${room.name}' played card '${name}' (${color}, ${value}).`);
         
         var winner = checkForWinner(socket, socket_2);
