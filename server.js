@@ -1,9 +1,9 @@
 const WebSocket = require("ws");
-const fs = require('fs');
+const fs = require("fs");
 
 const port = 5000;
 const wss = new WebSocket.Server({ port: port });
-const defaultDeck = JSON.parse(fs.readFileSync('deck.json', 'utf8'));
+const defaultDeck = JSON.parse(fs.readFileSync("deck.json", "utf8"));
 
 let rooms = [];
 
@@ -33,12 +33,16 @@ wss.on("connection", (socket) => {
       case "Join Room": {
         let room = getRoomByName(data.Name);
         if (!room || room.password !== data.Password) {
-          socket.send(JSON.stringify({ error: "Room does not exist or incorrect password" }));
+          socket.send(
+            JSON.stringify({
+              error: "Room does not exist or incorrect password",
+            })
+          );
           return;
         }
 
         let socket_2 = room.players.find((player) => player.id != socket.id);
-        
+
         socket = joinRoom(room, socket, data.Nickname);
 
         room.deck = shuffleDeck(room.deck);
@@ -46,21 +50,27 @@ wss.on("connection", (socket) => {
         socket_2.cards = drawCards(room.deck, 7);
         room.discardPile = drawCards(room.deck, 1)[0];
 
-        socket.send(JSON.stringify({
-          responseType: 'Game Started',
-          cardsDrawn: socket.cards,
-          opponentNickname: socket_2.nickname,
-          opponentCardsDrawnNumber: socket_2.cards.length,
-          discardPile: room.discardPile
-        }));
+        socket.send(
+          JSON.stringify({
+            responseType: "Game Started",
+            cardsDrawn: socket.cards,
+            opponentNickname: socket_2.nickname,
+            opponentCardsDrawnNumber: socket_2.cards.length,
+            discardPile: room.discardPile,
+            deckCardsNumber: room.deck.length,
+          })
+        );
 
-        socket_2.send(JSON.stringify({
-          responseType: 'Game Started',
-          cardsDrawn: socket_2.cards,
-          opponentNickname: socket.nickname,
-          opponentCardsDrawnNumber: socket.cards.length,
-          discardPile: room.discardPile
-        }));
+        socket_2.send(
+          JSON.stringify({
+            responseType: "Game Started",
+            cardsDrawn: socket_2.cards,
+            opponentNickname: socket.nickname,
+            opponentCardsDrawnNumber: socket.cards.length,
+            discardPile: room.discardPile,
+            deckCardsNumber: room.deck.length,
+          })
+        );
 
         console.log(`Player '${socket.nickname}' joined room '${room.name}'.`);
         break;
@@ -72,65 +82,108 @@ wss.on("connection", (socket) => {
         let name = data.Name;
         let color = data.Color;
         let value = data.Value;
-        
-        socket.cards.splice(socket.cards.findIndex(card => card === name), 1);
-        
-        room.discardPile = `${color}_${value}`;
-        
-        socket.send(JSON.stringify({
-          responseType: 'Card Played',
-          discardPile: room.discardPile,
-          yourTurn: false,
-        }));
-        
-        socket_2.send(JSON.stringify({
-          responseType: 'Card Played',
-          discardPile: room.discardPile,
-          yourTurn: true,
-        }));
 
-        console.log(socket.cards);
-        console.log(socket_2.cards)
-        console.log(`Player '${socket.nickname}' in room '${room.name}' played card '${name}' (${color}, ${value}).`);
-        
+        let index = socket.cards.findIndex((card) => card === name);
+        if (index !== -1) {
+          socket.cards.splice(index, 1);
+        } else {
+          console.log(`Unexpected error, requested card not found.`);
+        }
+
+        room.discardPile = `${color}_${value}`;
+
+        socket.send(
+          JSON.stringify({
+            responseType: "Card Played",
+            discardPile: room.discardPile,
+          })
+        );
+
+        socket_2.send(
+          JSON.stringify({
+            responseType: "Card Played",
+            discardPile: room.discardPile,
+          })
+        );
+
+
         var winner = checkForWinner(socket, socket_2);
         if (winner != null) {
           console.log(`\n'${winner.nickname}' in room '${room.name}' has won!\n`);
           let loser = room.players.find((player) => player.id != winner.id);
-          
-          winner.send(JSON.stringify({
-            responseType: 'Game Ended',
-            winner: true
-          }));
 
-          loser.send(JSON.stringify({
-            responseType: 'Game Ended',
-            winner: false
-          }));
+          winner.send(
+            JSON.stringify({
+              responseType: "Game Ended",
+              winner: true,
+            })
+          );
+
+          loser.send(
+            JSON.stringify({
+              responseType: "Game Ended",
+              winner: false,
+            })
+          );
+          return;
         }
+
+        switch (value) {
+          case "Draw2": {
+            changeTurn(socket_2);
+            actionDrawCards(socket_2, 2);
+            sendCheckCardsTo(socket_2);
+            break;
+          }
+          case "Draw4": {
+            changeTurn(socket_2);
+            actionDrawCards(socket_2, 4);
+            sendCheckCardsTo(socket_2);
+            break;
+          }
+          case "Skip": {
+            sendCheckCardsTo(socket); // this time socket needs to check its cards, because it's his turn again
+            break;
+          }
+          case "Swap": {
+            let tmp = socket.cards;
+            socket.cards = socket_2.cards;
+            socket_2.cards = tmp;
+
+            socket.send(
+              JSON.stringify({
+                responseType: "Card Swapped",
+                newCards: socket.cards,
+              })
+            );
+
+            socket_2.send(
+              JSON.stringify({
+                responseType: "Card Swapped",
+                newCards: socket_2.cards,
+              })
+            );
+            
+            changeTurn(socket_2);
+            sendCheckCardsTo(socket_2);
+            break;
+          }
+          default: 
+            changeTurn(socket_2);
+            sendCheckCardsTo(socket_2);
+            break;
+        }
+        
+        console.log(`Player '${socket.nickname}' in room '${room.name}' played card '${name}' (${color}, ${value}).`);
 
         break;
       }
       case "Draw Card": {
-        let room = getRoomByName(socket.roomName);
-        let socket_2 = room.players.find((player) => player.id != socket.id);
-        
         let quantity = data.Quantity;
-
-        let drawnCards = drawCards(room.deck, quantity);
-        socket.cards = [...socket.cards, ...drawnCards];
         
-        socket.send(JSON.stringify({
-          responseType: 'Card Drawn',
-          drawnCards: drawnCards
-        }));
-
-        socket_2.send(JSON.stringify({
-          responseType: 'Card Drawn',
-          opponentCardsDrawnNumber: drawnCards.length
-        }));
+        actionDrawCards(socket, quantity);
+        sendCheckCardsTo(socket);
         
-        console.log(`Player '${socket.nickname}' in room '${room.name}' has drawn ${drawnCards.length} card(s) (${drawnCards}).`);
         break;
       }
       default:
@@ -145,10 +198,13 @@ wss.on("connection", (socket) => {
       if (room.players.length === 0) {
         rooms = rooms.filter((r) => r !== room);
       }
-      console.log(`Player '${socket.nickname}' disconnected from room '${room.name}'.`);
+      console.log(
+        `Player '${socket.nickname}' disconnected from room '${room.name}'.`
+      );
     }
   });
 });
+
 
 function createRoom(name, password) {
   return {
@@ -156,9 +212,10 @@ function createRoom(name, password) {
     password: password,
     players: [],
     deck: [...defaultDeck.deck], // copy the object without reference
-    discardPile: null
+    discardPile: null,
   };
 }
+
 
 function joinRoom(room, socket, nickname) {
   socket.id = room.players.length + 1;
@@ -171,9 +228,11 @@ function joinRoom(room, socket, nickname) {
   return socket;
 }
 
+
 function getRoomByName(name) {
   return rooms.find((room) => room.name === name);
 }
+
 
 function shuffleDeck(array) {
   for (let i = array.length - 1; i > 0; i--) {
@@ -183,9 +242,6 @@ function shuffleDeck(array) {
   return array;
 }
 
-function drawCards(array, count) {
-  return array.splice(-count, count);
-}
 
 function checkForWinner(socket, socket_2) {
   if (socket.cards.length == 0) return socket;
@@ -193,6 +249,59 @@ function checkForWinner(socket, socket_2) {
   return null;
 }
 
-// TO DO
-// - Action cards
-// - Deck running out of cards
+
+function drawCards(array, count) {
+  return array.splice(-count, count);
+}
+
+
+function actionDrawCards(socket, count) {
+  let room = getRoomByName(socket.roomName);
+  let socket_2 = room.players.find((player) => player.id != socket.id);
+
+  let drawnCards = drawCards(room.deck, count);
+  socket.cards = [...socket.cards, ...drawnCards];
+
+  socket.send(
+    JSON.stringify({
+      responseType: "Card Drawn",
+      drawnCards: drawnCards,
+      deckCardsNumber: room.deck.length,
+    })
+  );
+
+  socket_2.send(
+    JSON.stringify({
+      responseType: "Card Drawn",
+      opponentCardsDrawnNumber: drawnCards.length,
+      deckCardsNumber: room.deck.length,
+    })
+  );
+
+  console.log(
+    `Player '${socket.nickname}' in room '${room.name}' has drawn ${drawnCards.length} card(s) (${drawnCards}).`
+  );
+}
+
+
+function changeTurn(socket) {
+  socket.send(
+    JSON.stringify({
+      responseType: "Turn Changed",
+      yourTurn: true,
+    })
+  );
+
+  let room = getRoomByName(socket.roomName);
+  let socket_2 = room.players.find((player) => player.id != socket.id);
+  socket_2.send(
+    JSON.stringify({
+      responseType: "Turn Changed",
+      yourTurn: false,
+    })
+  );
+}
+
+function sendCheckCardsTo(socket) {
+  socket.send(JSON.stringify({ responseType: "Check Cards" }));
+}
