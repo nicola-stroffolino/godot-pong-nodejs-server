@@ -4,11 +4,10 @@
   "description": "Backed NodeJs server that takes advantage of Web Sockets to coordinate a Pong multiplayer game made in Godot.",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js"
   },
   "repository": {
-    "type": "git",
-    "url": "git+https://github.com/nicola-stroffolino/godot-pong-nodejs-server.git"
+    "url": "https://glitch.com/edit/#!/glitch-hello-node"
   },
   "author": "Nicola Stroffolino",
   "license": "MIT",
@@ -18,5 +17,12 @@
   "homepage": "https://github.com/nicola-stroffolino/godot-pong-nodejs-server#readme",
   "dependencies": {
     "ws": "^8.17.0"
-  }
+  },
+  "engines": {
+    "node": "14.x"
+  },
+  "keywords": [
+    "node",
+    "glitch"
+  ]
 }
